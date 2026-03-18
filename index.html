@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuralClip — AI YouTube Summarizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #070810;
+      --surface:   #0d0f1e;
+      --panel:     #12152a;
+      --border:    #1e2340;
+      --amber:     #f5a623;
+      --amber-dim: #9b6514;
+      --amber-glow:#f5a62330;
+      --teal:      #00d4aa;
+      --teal-dim:  #004d3e;
+      --red:       #ff4c4c;
+      --text:      #e8eaf2;
+      --muted:     #6b7094;
+      --mono:      'JetBrains Mono', monospace;
+      --display:   'Bebas Neue', sans-serif;
+      --body:      'DM Sans', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--body);
+      font-weight: 300;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Noise grain overlay ───────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.5;
+    }
+
+    /* ── Animated grid bg ──────────────────────────────────── */
+    .grid-bg {
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+      opacity: 0.4;
+      z-index: 0;
+    }
+
+    /* ── Ambient glow blobs ────────────────────────────────── */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+    .blob-1 { width: 600px; height: 400px; background: #f5a62315; top: -100px; left: -100px; animation-delay: 0s; }
+    .blob-2 { width: 500px; height: 500px; background: #00d4aa0d; top: 30%; right: -150px; animation-delay: -4s; }
+    .blob-3 { width: 400px; height: 300px; background: #f5a62308; bottom: 0; left: 30%; animation-delay: -8s; }
+
+    @keyframes drift {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(30px, -20px) scale(1.05); }
+    }
+
+    /* ── Layout ────────────────────────────────────────────── */
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* ── Header ────────────────────────────────────────────── */
+    header {
+      padding: 56px 0 48px;
+      text-align: center;
+      animation: fadeDown 0.8s ease both;
+    }
+
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--amber-dim);
+      border-radius: 2px;
+      padding: 4px 14px 4px 10px;
+      margin-bottom: 28px;
+      background: #f5a6230a;
+    }
+
+    .logo-badge .dot {
+      width: 7px; height: 7px;
+      background: var(--amber);
+      border-radius: 50%;
+      animation: pulse 2s ease infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .logo-badge span {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--amber);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-family: var(--display);
+      font-size: clamp(52px, 10vw, 96px);
+      line-height: 0.9;
+      letter-spacing: 0.02em;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    h1 .accent { color: var(--amber); }
+
+    .tagline {
+      font-size: 15px;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+      max-width: 380px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* ── Input Card ────────────────────────────────────────── */
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 32px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.8s ease 0.2s both;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--amber-dim), transparent);
+    }
+
+    .input-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .url-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 14px 18px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .url-input::placeholder { color: var(--muted); }
+
+    .url-input:focus {
+      border-color: var(--amber-dim);
+      box-shadow: 0 0 0 3px var(--amber-glow);
+    }
+
+    .btn-summarize {
+      background: var(--amber);
+      color: #070810;
+      border: none;
+      border-radius: 3px;
+      padding: 14px 28px;
+      font-family: var(--display);
+      font-size: 18px;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .btn-summarize:hover {
+      background: #ffc14d;
+      box-shadow: 0 0 24px var(--amber-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-summarize:active { transform: translateY(0); }
+
+    .btn-summarize:disabled {
+      background: var(--amber-dim);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* ── Progress / Loader ─────────────────────────────────── */
+    #loader {
+      display: none;
+      text-align: center;
+      padding: 48px 0;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    .spinner-wrap {
+      position: relative;
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 24px;
+    }
+
+    .spinner-ring {
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      animation: spin 1.5s linear infinite;
+    }
+
+    .spinner-ring:nth-child(1) {
+      border-top-color: var(--amber);
+      animation-duration: 1.2s;
+    }
+    .spinner-ring:nth-child(2) {
+      border-right-color: var(--teal);
+      animation-duration: 1.8s;
+      animation-direction: reverse;
+      inset: 10px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loader-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .step {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 0.3s;
+    }
+
+    .step.active { color: var(--amber); }
+    .step.done   { color: var(--teal); }
+
+    .step-icon { font-size: 14px; }
+
+    /* ── Error Banner ──────────────────────────────────────── */
+    #error-box {
+      display: none;
+      background: #1a0808;
+      border: 1px solid #5c1010;
+      border-radius: 4px;
+      padding: 16px 20px;
+      color: var(--red);
+      font-family: var(--mono);
+      font-size: 13px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    /* ── Results ───────────────────────────────────────────── */
+    #results {
+      display: none;
+      animation: fadeUp 0.6s ease both;
+    }
+
+    .result-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .meta-pill {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      padding: 4px 12px;
+      border-radius: 2px;
+      border: 1px solid;
+    }
+
+    .pill-amber { border-color: var(--amber-dim); color: var(--amber); background: var(--amber-glow); }
+    .pill-teal  { border-color: var(--teal-dim);  color: var(--teal);  background: #00d4aa10; }
+
+    /* Thumbnail */
+    .thumb-wrap {
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      margin-bottom: 28px;
+      position: relative;
+    }
+
+    .thumb-wrap img {
+      width: 100%;
+      display: block;
+    }
+
+    .thumb-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, var(--bg) 0%, transparent 40%);
+    }
+
+    /* Section headers */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .section-title {
+      font-family: var(--display);
+      font-size: 28px;
+      letter-spacing: 0.05em;
+    }
+
+    .section-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--border), transparent);
+    }
+
+    /* Final summary panel */
+    .summary-panel {
+      background: linear-gradient(135deg, #0f1525 0%, #0a0e1a 100%);
+      border: 1px solid var(--amber-dim);
+      border-radius: 4px;
+      padding: 28px;
+      margin-bottom: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .summary-panel::after {
+      content: '';
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, var(--amber-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .summary-text {
+      font-size: 15px;
+      line-height: 1.8;
+      color: #c8cde0;
+      font-weight: 400;
+    }
+
+    /* Notes list */
+    .notes-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .note-item {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--amber);
+      border-radius: 0 4px 4px 0;
+      padding: 16px 20px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #a8adc5;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      animation: slideIn 0.4s ease both;
+    }
+
+    .note-num {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--amber);
+      padding-top: 3px;
+      flex-shrink: 0;
+      letter-spacing: 0.05em;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-12px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Copy button */
+    .btn-copy {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 20px;
+    }
+
+    .btn-copy:hover { border-color: var(--amber-dim); color: var(--amber); }
+    .btn-copy.copied { border-color: var(--teal); color: var(--teal); }
+
+    /* ── Footer ────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 40px 0 0;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: #2a2e4a;
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Animations ────────────────────────────────────────── */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Responsive ────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .input-row { flex-direction: column; }
+      .card { padding: 20px; }
+      .btn-summarize { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="grid-bg"></div>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <div class="wrapper">
+
+    <!-- ── Header ── -->
+    <header>
+      <div class="logo-badge">
+        <div class="dot"></div>
+        <span>AI · Video · Intelligence</span>
+      </div>
+      <h1>NEURAL<br><span class="accent">CLIP</span></h1>
+      <p class="tagline">Drop any YouTube link. Get AI-generated notes and a full summary in seconds.</p>
+    </header>
+
+    <!-- ── Input ── -->
+    <div class="card">
+      <label class="input-label" for="yt-url">▸ YouTube URL</label>
+      <div class="input-row">
+        <input
+          id="yt-url"
+          class="url-input"
+          type="url"
+          placeholder="https://www.youtube.com/watch?v=..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="btn-summarize" id="btn-go" onclick="startSummarize()">
+          ANALYZE
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Error ── -->
+    <div id="error-box">⚠ <span id="error-msg"></span></div>
+
+    <!-- ── Loader ── -->
+    <div id="loader">
+      <div class="spinner-wrap">
+        <div class="spinner-ring"></div>
+        <div class="spinner-ring"></div>
+      </div>
+      <div class="loader-steps">
+        <div class="step" id="step-1"><span class="step-icon">🎬</span> FETCHING TRANSCRIPT</div>
+        <div class="step" id="step-2"><span class="step-icon">🔪</span> CHUNKING TEXT</div>
+        <div class="step" id="step-3"><span class="step-icon">🧠</span> RUNNING AI MODEL</div>
+        <div class="step" id="step-4"><span class="step-icon">📝</span> COMPILING NOTES</div>
+      </div>
+    </div>
+
+    <!-- ── Results ── -->
+    <div id="results">
+
+      <div class="result-meta">
+        <span class="meta-pill pill-amber" id="meta-chunks"></span>
+        <span class="meta-pill pill-teal"  id="meta-length"></span>
+      </div>
+
+      <!-- Thumbnail -->
+      <div class="thumb-wrap" id="thumb-wrap">
+        <img id="thumb-img" src="" alt="Video thumbnail" />
+        <div class="thumb-overlay"></div>
+      </div>
+
+      <!-- Summary -->
+      <div class="section-header">
+        <h2 class="section-title">SUMMARY</h2>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="summary-panel">
+        <p class="summary-text" id="final-summary"></p>
+        <button class="btn-copy" id="copy-summary" onclick="copyText('final-summary', 'copy-summary')">
+          ⎘ COPY SUMMARY
+        </button>
+      </div>
+
+      <!-- Key Notes -->
+      <div class="section-header">
+        <h2 class="section-title">KEY NOTES</h2>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="notes-grid" id="notes-list"></div>
+
+    </div>
+
+    <footer>NEURALCLIP · POWERED BY FLAN-T5 + YOUTUBE TRANSCRIPT API</footer>
+
+  </div>
+
+  <script>
+    /* ── State ─────────────────────────────────────────────── */
+    let isRunning = false;
+    let stepTimer = null;
+
+    /* ── Loader step animator ──────────────────────────────── */
+    function animateSteps() {
+      const steps = ['step-1','step-2','step-3','step-4'];
+      let i = 0;
+      steps.forEach(id => document.getElementById(id).className = 'step');
+      stepTimer = setInterval(() => {
+        if (i > 0) document.getElementById(steps[i-1]).className = 'step done';
+        if (i < steps.length) {
+          document.getElementById(steps[i]).className = 'step active';
+          i++;
+        }
+      }, 1800);
+    }
+
+    function stopSteps() {
+      clearInterval(stepTimer);
+      ['step-1','step-2','step-3','step-4'].forEach(id => {
+        document.getElementById(id).className = 'step done';
+      });
+    }
+
+    /* ── Show/hide helpers ─────────────────────────────────── */
+    function show(id) { document.getElementById(id).style.display = 'block'; }
+    function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+    function showError(msg) {
+      document.getElementById('error-msg').textContent = msg;
+      show('error-box');
+    }
+
+    /* ── Main flow ─────────────────────────────────────────── */
+    async function startSummarize() {
+      if (isRunning) return;
+      const url = document.getElementById('yt-url').value.trim();
+
+      if (!url) {
+        showError('Please enter a YouTube URL before clicking Analyze.');
+        return;
+      }
+
+      // Reset UI
+      isRunning = true;
+      hide('error-box');
+      hide('results');
+      show('loader');
+      document.getElementById('btn-go').disabled = true;
+      animateSteps();
+
+      try {
+        const res = await fetch('/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || 'Server error. Please try again.');
+        }
+
+        stopSteps();
+        renderResults(data);
+
+      } catch (err) {
+        stopSteps();
+        showError(err.message);
+      } finally {
+        hide('loader');
+        document.getElementById('btn-go').disabled = false;
+        isRunning = false;
+      }
+    }
+
+    /* ── Render results ────────────────────────────────────── */
+    function renderResults(data) {
+      // Meta pills
+      document.getElementById('meta-chunks').textContent = `${data.chunk_count} SEGMENTS ANALYZED`;
+      const kb = (data.transcript_length / 1000).toFixed(1);
+      document.getElementById('meta-length').textContent = `${kb}K CHARS TRANSCRIPT`;
+
+      // Thumbnail
+      const thumbUrl = `https://img.youtube.com/vi/${data.video_id}/maxresdefault.jpg`;
+      document.getElementById('thumb-img').src = thumbUrl;
+      document.getElementById('thumb-img').onerror = function() {
+        document.getElementById('thumb-wrap').style.display = 'none';
+      };
+
+      // Final summary
+      document.getElementById('final-summary').textContent = data.final_summary;
+
+      // Bullet notes
+      const list = document.getElementById('notes-list');
+      list.innerHTML = '';
+      data.bullet_notes.forEach((note, i) => {
+        const item = document.createElement('div');
+        item.className = 'note-item';
+        item.style.animationDelay = `${i * 0.06}s`;
+        item.innerHTML = `<span class="note-num">${String(i+1).padStart(2,'0')}</span><span>${note}</span>`;
+        list.appendChild(item);
+      });
+
+      show('results');
+      document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* ── Copy to clipboard ─────────────────────────────────── */
+    async function copyText(targetId, btnId) {
+      const text = document.getElementById(targetId).textContent;
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById(btnId);
+      btn.classList.add('copied');
+      btn.textContent = '✓ COPIED';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = '⎘ COPY SUMMARY';
+      }, 2000);
+    }
+
+    /* ── Enter key ─────────────────────────────────────────── */
+    document.getElementById('yt-url').addEventListener('keydown', e => {
+      if (e.key === 'Enter') startSummarize();
+    });
+  </script>
+</body>
+</html>
