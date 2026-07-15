@@ -1,50 +1,53 @@
-# NeuralClip
+# Recap — Local YouTube Summarizer
 
-NeuralClip is a Flask website that turns a captioned YouTube video into concise segment notes and a cohesive AI-generated summary.
+Recap is a Flask website that turns a captioned YouTube video into a concise overview and structured key points. Its summarizer runs locally with a frequency-and-position ranking algorithm—no AI account, API token, model download, or paid service is required.
 
-## Features
+## How the local summarizer works
 
-- Supports standard, shortened, Shorts, Live, and embed YouTube links
-- Fetches English captions with `youtube-transcript-api`
-- Splits long transcripts safely and summarizes them with Hugging Face Inference
-- Responsive interface with loading, error, thumbnail, copy, and retry states
-- Health endpoint, bounded requests, safe API errors, and configurable processing limits
+1. Fetches the best available caption track, preferring English.
+2. Translates non-English captions to English when YouTube supports it.
+3. Removes caption markers and normalizes the transcript.
+4. Splits the transcript into readable sentences, including Unicode scripts.
+5. Removes common low-information words.
+6. Scores sentences by important-word frequency, length, and position.
+7. Filters near-duplicate sentences.
+8. Restores selected sentences to their original order for readability.
 
-## Local setup
+This is an **extractive** summarizer: it selects the strongest original sentences instead of generating new claims. That keeps it fast, private, deterministic, and less prone to invented facts.
+
+## Run locally
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-$env:HF_API_TOKEN = "your_hugging_face_token"
 python app.py
 ```
 
-Open `http://localhost:5000`. The token must have permission to call Hugging Face's inference service for the configured model.
+Open [http://localhost:5000](http://localhost:5000). No environment variable is required.
 
 ## Configuration
 
 | Variable | Default | Purpose |
-|---|---|---|
-| `HF_API_TOKEN` | required | Hugging Face access token |
-| `HF_MODEL` | `google/flan-t5-base` | Model name used to build the default endpoint |
-| `HF_API_URL` | model inference URL | Override for a dedicated/custom inference endpoint |
-| `MAX_TRANSCRIPT_CHARS` | `24000` | Maximum transcript text processed per request |
-| `SUMMARY_CHUNK_SIZE` | `1800` | Approximate characters per transcript segment |
-| `MAX_SUMMARY_CHUNKS` | `12` | Maximum AI calls for segment notes |
-| `PORT` | `5000` | Local server port |
-
-`GET /health` reports whether the web process is healthy and whether an AI token is configured. It never exposes the token.
+|---|---:|---|
+| `MAX_TRANSCRIPT_CHARS` | `50000` | Maximum caption text read per request |
+| `SUMMARY_CHUNK_SIZE` | `1800` | Characters per processing chunk |
+| `MAX_SUMMARY_CHUNKS` | `30` | Maximum chunks processed |
+| `MAX_KEY_POINTS` | `8` | Maximum key points returned |
+| `SUMMARY_SENTENCES` | `6` | Maximum overview sentences |
+| `PORT` | `5000` | Flask server port |
 
 ## API
 
-`POST /summarize` with JSON:
+Send `POST /summarize` with JSON:
 
 ```json
 {"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
 ```
 
-Successful responses include `video_id`, `bullet_notes`, `final_summary`, `chunk_count`, `transcript_length`, and `transcript_truncated`.
+The response contains `video_id`, `bullet_notes`, `final_summary`, processing metadata, and `summary_method: "local-extractive"`.
+
+`GET /health` returns the service status and summarizer method.
 
 ## Tests
 
@@ -52,19 +55,11 @@ Successful responses include `video_id`, `bullet_notes`, `final_summary`, `chunk
 python -m unittest discover -s tests -v
 ```
 
-Tests mock YouTube and AI calls, so they do not require network access or credentials.
-
-## Deployment
-
-Use the included `Procfile` with a Python 3.11-compatible host and set `HF_API_TOKEN` as a secret environment variable. The production command is:
-
-```text
-gunicorn app:app --timeout 300 --workers 1
-```
+The tests run without network access or credentials.
 
 ## Limitations
 
-- A video must expose an English caption track.
-- Private, restricted, or region-blocked videos may not provide transcripts.
-- Only the configured transcript limit is processed; the response tells the UI when truncation occurred.
-- Hugging Face availability, quotas, and model access affect summarization.
+- The video must expose at least one manual or auto-generated caption track. A video with captions disabled has no transcript for the summarizer to read.
+- Private, restricted, or region-blocked videos may not provide captions.
+- Extractive summaries preserve original wording and will be less conversational than generative AI summaries.
+- Caption quality directly affects summary quality.

@@ -11,9 +11,14 @@ class AppTests(unittest.TestCase):
     def test_index_and_health(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
+        page = response.get_data(as_text=True)
+        self.assertIn('id="summary-form"', page)
+        self.assertIn("fetch('/summarize'", page)
+        self.assertIn('id="results"', page)
         response.close()
         health = self.client.get("/health")
         self.assertEqual(health.status_code, 200)
+        self.assertEqual(health.get_json()["summarizer"], "local-extractive")
         health.close()
 
     def test_rejects_bad_json(self):

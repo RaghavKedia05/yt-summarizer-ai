@@ -16,7 +16,7 @@ def create_app() -> Flask:
 
     @app.get("/health")
     def health():
-        return jsonify({"status": "ok", "ai_configured": bool(os.getenv("HF_API_TOKEN"))})
+        return jsonify({"status": "ok", "summarizer": "local-extractive"})
 
     @app.post("/summarize")
     def summarize():
