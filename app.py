@@ -1,32 +1,46 @@
-from flask import Flask, request, jsonify, render_template
+import logging
+import os
+
+from flask import Flask, jsonify, request, send_from_directory
+
 from summarizer import process_video
 
-app = Flask(__name__)
+
+def create_app() -> Flask:
+    app = Flask(__name__)
+    app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
+
+    @app.get("/")
+    def index():
+        return send_from_directory(app.root_path, "index.html")
+
+    @app.get("/health")
+    def health():
+        return jsonify({"status": "ok", "ai_configured": bool(os.getenv("HF_API_TOKEN"))})
+
+    @app.post("/summarize")
+    def summarize():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or not isinstance(data.get("url"), str):
+            return jsonify({"error": "Provide a YouTube URL in the request body."}), 400
+
+        url = data["url"].strip()
+        if not url:
+            return jsonify({"error": "YouTube URL cannot be empty."}), 400
+
+        try:
+            return jsonify(process_video(url))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 422
+        except Exception:
+            app.logger.exception("Unexpected error while summarizing a video")
+            return jsonify({"error": "The video could not be summarized. Please try again."}), 500
+
+    return app
 
 
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-
-@app.route("/summarize", methods=["POST"])
-def summarize():
-    data = request.get_json(silent=True)
-    if not data or "url" not in data:
-        return jsonify({"error": "Missing 'url' in request body."}), 400
-
-    url = data["url"].strip()
-    if not url:
-        return jsonify({"error": "URL cannot be empty."}), 400
-
-    try:
-        result = process_video(url)
-        return jsonify(result)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 422
-    except Exception as e:
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
-
+app = create_app()
 
 if __name__ == "__main__":
-    app.run(debug=False, host="0.0.0.0", port=5000)
+    logging.basicConfig(level=logging.INFO)
+    app.run(debug=os.getenv("FLASK_DEBUG") == "1", host="0.0.0.0", port=int(os.getenv("PORT", "5000")))

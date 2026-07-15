@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NeuralClip — AI YouTube Summarizer</title>
+  <title>NeuralClip - AI YouTube Summarizer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
-    /* ── Reset & Base ──────────────────────────────────────── */
+    /* -- Reset & Base ---------------------------------------- */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
@@ -39,7 +39,7 @@
       overflow-x: hidden;
     }
 
-    /* ── Noise grain overlay ───────────────────────────────── */
+    /* -- Noise grain overlay --------------------------------- */
     body::before {
       content: '';
       position: fixed; inset: 0;
@@ -49,7 +49,7 @@
       opacity: 0.5;
     }
 
-    /* ── Animated grid bg ──────────────────────────────────── */
+    /* -- Animated grid bg ------------------------------------ */
     .grid-bg {
       position: fixed; inset: 0;
       background-image:
@@ -61,7 +61,7 @@
       z-index: 0;
     }
 
-    /* ── Ambient glow blobs ────────────────────────────────── */
+    /* -- Ambient glow blobs ---------------------------------- */
     .blob {
       position: fixed;
       border-radius: 50%;
@@ -79,7 +79,7 @@
       to   { transform: translate(30px, -20px) scale(1.05); }
     }
 
-    /* ── Layout ────────────────────────────────────────────── */
+    /* -- Layout ---------------------------------------------- */
     .wrapper {
       position: relative;
       z-index: 1;
@@ -88,7 +88,7 @@
       padding: 0 24px 80px;
     }
 
-    /* ── Header ────────────────────────────────────────────── */
+    /* -- Header ---------------------------------------------- */
     header {
       padding: 56px 0 48px;
       text-align: center;
@@ -146,7 +146,7 @@
       line-height: 1.6;
     }
 
-    /* ── Input Card ────────────────────────────────────────── */
+    /* -- Input Card ------------------------------------------ */
     .card {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -232,7 +232,7 @@
       box-shadow: none;
     }
 
-    /* ── Progress / Loader ─────────────────────────────────── */
+    /* -- Progress / Loader ----------------------------------- */
     #loader {
       display: none;
       text-align: center;
@@ -290,7 +290,7 @@
 
     .step-icon { font-size: 14px; }
 
-    /* ── Error Banner ──────────────────────────────────────── */
+    /* -- Error Banner ---------------------------------------- */
     #error-box {
       display: none;
       background: #1a0808;
@@ -304,7 +304,7 @@
       animation: fadeUp 0.4s ease both;
     }
 
-    /* ── Results ───────────────────────────────────────────── */
+    /* -- Results --------------------------------------------- */
     #results {
       display: none;
       animation: fadeUp 0.6s ease both;
@@ -454,7 +454,7 @@
     .btn-copy:hover { border-color: var(--amber-dim); color: var(--amber); }
     .btn-copy.copied { border-color: var(--teal); color: var(--teal); }
 
-    /* ── Footer ────────────────────────────────────────────── */
+    /* -- Footer ---------------------------------------------- */
     footer {
       text-align: center;
       padding: 40px 0 0;
@@ -464,7 +464,7 @@
       letter-spacing: 0.1em;
     }
 
-    /* ── Animations ────────────────────────────────────────── */
+    /* -- Animations ------------------------------------------ */
     @keyframes fadeDown {
       from { opacity: 0; transform: translateY(-20px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -475,7 +475,7 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── Responsive ────────────────────────────────────────── */
+    /* -- Responsive ------------------------------------------ */
     @media (max-width: 600px) {
       .input-row { flex-direction: column; }
       .card { padding: 20px; }
@@ -492,52 +492,54 @@
 
   <div class="wrapper">
 
-    <!-- ── Header ── -->
+    <!-- -- Header -- -->
     <header>
       <div class="logo-badge">
         <div class="dot"></div>
-        <span>AI · Video · Intelligence</span>
+        <span>AI / VIDEO / INTELLIGENCE</span>
       </div>
       <h1>NEURAL<br><span class="accent">CLIP</span></h1>
       <p class="tagline">Drop any YouTube link. Get AI-generated notes and a full summary in seconds.</p>
     </header>
 
-    <!-- ── Input ── -->
+    <!-- -- Input -- -->
     <div class="card">
-      <label class="input-label" for="yt-url">▸ YouTube URL</label>
-      <div class="input-row">
+      <label class="input-label" for="yt-url">YOUTUBE URL</label>
+      <form class="input-row" id="summary-form">
         <input
           id="yt-url"
           class="url-input"
           type="url"
           placeholder="https://www.youtube.com/watch?v=..."
           autocomplete="off"
+          inputmode="url"
+          required
           spellcheck="false"
         />
-        <button class="btn-summarize" id="btn-go" onclick="startSummarize()">
+        <button class="btn-summarize" id="btn-go" type="submit">
           ANALYZE
         </button>
-      </div>
+      </form>
     </div>
 
-    <!-- ── Error ── -->
-    <div id="error-box">⚠ <span id="error-msg"></span></div>
+    <!-- -- Error -- -->
+    <div id="error-box" role="alert">! <span id="error-msg"></span></div>
 
-    <!-- ── Loader ── -->
-    <div id="loader">
+    <!-- -- Loader -- -->
+    <div id="loader" role="status" aria-live="polite">
       <div class="spinner-wrap">
         <div class="spinner-ring"></div>
         <div class="spinner-ring"></div>
       </div>
       <div class="loader-steps">
-        <div class="step" id="step-1"><span class="step-icon">🎬</span> FETCHING TRANSCRIPT</div>
-        <div class="step" id="step-2"><span class="step-icon">🔪</span> CHUNKING TEXT</div>
-        <div class="step" id="step-3"><span class="step-icon">🧠</span> RUNNING AI MODEL</div>
-        <div class="step" id="step-4"><span class="step-icon">📝</span> COMPILING NOTES</div>
+        <div class="step" id="step-1"><span class="step-icon">01</span> FETCHING TRANSCRIPT</div>
+        <div class="step" id="step-2"><span class="step-icon">02</span> CHUNKING TEXT</div>
+        <div class="step" id="step-3"><span class="step-icon">03</span> RUNNING AI MODEL</div>
+        <div class="step" id="step-4"><span class="step-icon">04</span> COMPILING NOTES</div>
       </div>
     </div>
 
-    <!-- ── Results ── -->
+    <!-- -- Results -- -->
     <div id="results">
 
       <div class="result-meta">
@@ -559,8 +561,8 @@
 
       <div class="summary-panel">
         <p class="summary-text" id="final-summary"></p>
-        <button class="btn-copy" id="copy-summary" onclick="copyText('final-summary', 'copy-summary')">
-          ⎘ COPY SUMMARY
+        <button class="btn-copy" id="copy-summary" type="button">
+          COPY SUMMARY
         </button>
       </div>
 
@@ -574,16 +576,16 @@
 
     </div>
 
-    <footer>NEURALCLIP · POWERED BY FLAN-T5 + YOUTUBE TRANSCRIPT API</footer>
+    <footer>NEURALCLIP / POWERED BY FLAN-T5 + YOUTUBE TRANSCRIPT API</footer>
 
   </div>
 
   <script>
-    /* ── State ─────────────────────────────────────────────── */
+    /* -- State ----------------------------------------------- */
     let isRunning = false;
     let stepTimer = null;
 
-    /* ── Loader step animator ──────────────────────────────── */
+    /* -- Loader step animator -------------------------------- */
     function animateSteps() {
       const steps = ['step-1','step-2','step-3','step-4'];
       let i = 0;
@@ -604,7 +606,7 @@
       });
     }
 
-    /* ── Show/hide helpers ─────────────────────────────────── */
+    /* -- Show/hide helpers ----------------------------------- */
     function show(id) { document.getElementById(id).style.display = 'block'; }
     function hide(id) { document.getElementById(id).style.display = 'none'; }
 
@@ -613,7 +615,7 @@
       show('error-box');
     }
 
-    /* ── Main flow ─────────────────────────────────────────── */
+    /* -- Main flow ------------------------------------------- */
     async function startSummarize() {
       if (isRunning) return;
       const url = document.getElementById('yt-url').value.trim();
@@ -657,15 +659,17 @@
       }
     }
 
-    /* ── Render results ────────────────────────────────────── */
+    /* -- Render results -------------------------------------- */
     function renderResults(data) {
       // Meta pills
       document.getElementById('meta-chunks').textContent = `${data.chunk_count} SEGMENTS ANALYZED`;
       const kb = (data.transcript_length / 1000).toFixed(1);
-      document.getElementById('meta-length').textContent = `${kb}K CHARS TRANSCRIPT`;
+      const truncated = data.transcript_truncated ? ' (LIMIT REACHED)' : '';
+      document.getElementById('meta-length').textContent = `${kb}K CHARS${truncated}`;
 
       // Thumbnail
       const thumbUrl = `https://img.youtube.com/vi/${data.video_id}/maxresdefault.jpg`;
+      document.getElementById('thumb-wrap').style.display = 'block';
       document.getElementById('thumb-img').src = thumbUrl;
       document.getElementById('thumb-img').onerror = function() {
         document.getElementById('thumb-wrap').style.display = 'none';
@@ -676,12 +680,17 @@
 
       // Bullet notes
       const list = document.getElementById('notes-list');
-      list.innerHTML = '';
+      list.replaceChildren();
       data.bullet_notes.forEach((note, i) => {
         const item = document.createElement('div');
         item.className = 'note-item';
         item.style.animationDelay = `${i * 0.06}s`;
-        item.innerHTML = `<span class="note-num">${String(i+1).padStart(2,'0')}</span><span>${note}</span>`;
+        const number = document.createElement('span');
+        number.className = 'note-num';
+        number.textContent = String(i + 1).padStart(2, '0');
+        const text = document.createElement('span');
+        text.textContent = note;
+        item.append(number, text);
         list.appendChild(item);
       });
 
@@ -689,22 +698,30 @@
       document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    /* ── Copy to clipboard ─────────────────────────────────── */
+    /* -- Copy to clipboard ----------------------------------- */
     async function copyText(targetId, btnId) {
       const text = document.getElementById(targetId).textContent;
-      await navigator.clipboard.writeText(text);
       const btn = document.getElementById(btnId);
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (_) {
+        showError('Clipboard access was blocked. Select the summary and copy it manually.');
+        return;
+      }
       btn.classList.add('copied');
-      btn.textContent = '✓ COPIED';
+      btn.textContent = 'COPIED';
       setTimeout(() => {
         btn.classList.remove('copied');
-        btn.innerHTML = '⎘ COPY SUMMARY';
+        btn.textContent = 'COPY SUMMARY';
       }, 2000);
     }
 
-    /* ── Enter key ─────────────────────────────────────────── */
-    document.getElementById('yt-url').addEventListener('keydown', e => {
-      if (e.key === 'Enter') startSummarize();
+    document.getElementById('summary-form').addEventListener('submit', event => {
+      event.preventDefault();
+      startSummarize();
+    });
+    document.getElementById('copy-summary').addEventListener('click', () => {
+      copyText('final-summary', 'copy-summary');
     });
   </script>
 </body>
